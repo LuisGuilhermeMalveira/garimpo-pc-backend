@@ -78,9 +78,25 @@ async function inserirFilhos(client, prospeccaoId, a) {
 router.post('/analisar', upload.array('imagem', 8), async (req, res, next) => {
   try {
     const b = req.body || {};
-    const imagens = imagensDoRequest(req);
-    const link = b.link || (b.tipo === 'link' ? b.conteudo : null) || null;
+    let imagens = imagensDoRequest(req);
+    let link = b.link || (b.tipo === 'link' ? b.conteudo : null) || null;
     let texto = b.texto || (b.tipo !== 'link' ? b.conteudo : null);
+
+    // captura da extensão: o print já está no servidor; puxa daqui
+    if (b.captura_id) {
+      const cap = await query(
+        'SELECT imagem_b64, mimetype, texto, link, origem FROM capturas WHERE id = $1 AND user_id = $2',
+        [Number(b.captura_id), req.userId]
+      );
+      if (!cap.rows[0]) {
+        return res.status(404).json({ erro: 'Captura não encontrada (expirou?). Garimpe a página de novo.' });
+      }
+      const c = cap.rows[0];
+      imagens = [{ base64: c.imagem_b64, mimetype: c.mimetype, buffer: Buffer.from(c.imagem_b64, 'base64') }];
+      texto = texto || c.texto || null;
+      link = link || c.link || null;
+      if (!b.origem && c.origem) b.origem = c.origem;
+    }
 
     // modo LINK: tenta ler o anúncio pelo link (best-effort). O link é salvo de
     // qualquer jeito; se a leitura falhar, o erro já orienta a usar o print.

@@ -86,7 +86,13 @@ function getProvider(tarefa) {
 async function executarTarefa({ tarefa, imagem, imagens, texto, providerNome, contexto }) {
   const prompt = getPrompt(tarefa);
   const provider = providerNome ? instanciar(providerNome) : getProvider(tarefa);
-  const instrucao = contexto ? `${prompt.instrucao}\n\nCONTEXTO: ${contexto}` : prompt.instrucao;
+  let instrucao = contexto ? `${prompt.instrucao}\n\nCONTEXTO: ${contexto}` : prompt.instrucao;
+  // imagem + texto juntos: o texto vira fonte adicional (a extensão manda o
+  // texto da página junto com o print — antes era descartado)
+  const temImagem = (imagens && imagens.length) || imagem;
+  if (temImagem && texto != null && String(texto).trim()) {
+    instrucao += `\n\nTEXTO DA PÁGINA (capturado junto do print; use como fonte adicional):\n${String(texto).slice(0, 12000)}`;
+  }
   const args = {
     schema: prompt.schema,
     instrucao,

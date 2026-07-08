@@ -14,6 +14,7 @@ const modificadoresRoutes = require('./routes/modificadores');
 const prospeccoesRoutes = require('./routes/prospeccoes');
 const configRoutes = require('./routes/config');
 const aiRoutes = require('./routes/ai');
+const capturasRoutes = require('./routes/capturas');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/modificadores', modificadoresRoutes);
 app.use('/prospeccoes', prospeccoesRoutes);
 app.use('/config', configRoutes);
 app.use('/ai', aiRoutes);
+app.use('/capturas', capturasRoutes);
 
 // --- 404 ---
 app.use((req, res) => {
