@@ -49,7 +49,7 @@ function chaveGrupo(item) {
 async function carregarCatalogo(userId) {
   const { rows } = await query(
     `SELECT p.id, p.categoria, p.nome, p.tipo, p.capacidade,
-            pe.preco_mediana
+            pe.preco_mediana, pe.amostras AS amostras_acumuladas
        FROM pecas p
        LEFT JOIN precos_efetivos pe ON pe.peca_id = p.id
       WHERE p.user_id = $1`,
@@ -138,6 +138,9 @@ async function calibrarAuto({ imagens, userId, provider, tolerancia, dryRun = fa
     if (!dryRun) {
       gravacao = await gravarCalibracao({ peca_id: peca.id, faixa, fonte: 'auto print' });
     }
+    // amostras que valem pra confiança = TOTAL acumulado (antes + este print),
+    // não só as deste print. Assim peça já calibrada não dá falso "base fraca".
+    const acumuladasAntes = Number(peca.amostras_acumuladas) || 0;
     calibradas.push({
       peca_id: peca.id,
       peca: peca.nome,
@@ -146,7 +149,8 @@ async function calibrarAuto({ imagens, userId, provider, tolerancia, dryRun = fa
       preco_mediana: faixa.preco_mediana,
       preco_min: faixa.preco_min,
       preco_max: faixa.preco_max,
-      amostras: faixa.amostras,
+      amostras_print: faixa.amostras,          // anúncios lidos neste print
+      amostras: acumuladasAntes + faixa.amostras, // total acumulado (base da confiança)
       outliers_descartados: g.precos.length - faixa.amostras,
       gravado: !dryRun,
       data: gravacao ? gravacao.data_calibracao : null,
