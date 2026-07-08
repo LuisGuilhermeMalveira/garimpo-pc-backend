@@ -58,7 +58,8 @@ function chaveGrupo(item) {
 async function carregarCatalogo(userId) {
   const { rows } = await query(
     `SELECT p.id, p.categoria, p.nome, p.tipo, p.capacidade,
-            pe.preco_mediana, pe.amostras AS amostras_acumuladas
+            pe.preco_mediana, pe.amostras AS amostras_acumuladas,
+            (CURRENT_DATE - pe.data_calibracao::date) AS dias_calibracao
        FROM pecas p
        LEFT JOIN precos_efetivos pe ON pe.peca_id = p.id
       WHERE p.user_id = $1`,
@@ -176,6 +177,30 @@ async function calibrarAuto({ imagens, userId, provider, tolerancia, dryRun = fa
     if (!peca) {
       ignoradas.push({ modelo: g.modelo, categoria: g.categoria, precos: g.precos, faixa, motivo: 'peça não existe no banco — crie no Catálogo e recalibre' });
       continue;
+    }
+
+    // sentinela anti-outlier solitário: 1 anúncio destoando >40% de um preço
+    // FIRME (>=6 amostras) e FRESCO (<=21 dias) não entra sozinho — provável
+    // anúncio quebrado/errado. Anti-congelamento: se o mercado mudou de
+    // verdade, virão VÁRIOS anúncios no preço novo — 2+ amostras passam e
+    // atualizam o banco normalmente; banco velho/magro também não barra.
+    const banco = peca.preco_mediana != null ? Number(peca.preco_mediana) : null;
+    const bancoFirme =
+      banco != null &&
+      Number(peca.amostras_acumuladas) >= 6 &&
+      peca.dias_calibracao != null &&
+      Number(peca.dias_calibracao) <= 21;
+    if (g.precos.length === 1 && bancoFirme) {
+      const desvio = Math.abs(g.precos[0] - banco) / banco;
+      if (desvio > 0.4) {
+        ignoradas.push({
+          modelo: g.modelo,
+          categoria: g.categoria,
+          precos: g.precos,
+          motivo: `único anúncio destoa ${Math.round(desvio * 100)}% do banco (R$${g.precos[0]} vs R$${Math.round(banco)}) — não entra sozinho; se o preço mudou mesmo, mais anúncios assim vão aparecer e aí entram`,
+        });
+        continue;
+      }
     }
 
     let gravacao = null;
