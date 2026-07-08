@@ -32,8 +32,11 @@ function capacidadeDoModelo(modelo) {
   return Math.round(m[2].toLowerCase() === 'tb' ? n * 1024 : n);
 }
 
-// tokens de marketing que NÃO diferenciam a peça (OC ≠ variante como Ti/Super)
-const RUIDO = /\b(oc|gaming|windforce|dual|sc|itx|mini)\b/gi;
+// ruído que NÃO diferencia a peça pra fins de preço — some no agrupamento:
+//  - tipo de memória (DDR5/GDDR5/GDDR6X...): o banco é por chip+VRAM, não por tipo.
+//    além de fragmentar, o "5" de DDR5 injeta um número que quebra o casamento.
+//  - marketing/edição (OC, gaming, dual, 3 fans...).
+const RUIDO = /\b(g?ddr\d[a-z]*|oc|gaming|windforce|dual|sc|itx|mini|founders|fe|[0-9]\s*fans?)\b/gi;
 
 function normalizarModelo(modelo) {
   return String(modelo).replace(RUIDO, ' ').replace(/\s+/g, ' ').trim();

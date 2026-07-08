@@ -67,6 +67,7 @@ const calibrador_auto = {
     '- modelo = NOME CANÔNICO, SEM marca e SEM SKU (mesma regra do app):',
     '  GPU -> chip + variante + VRAM. Ex.: "EVGA GTX 1660 Super SC 6GB"=>"GTX 1660 Super 6GB";',
     '        "Galax RTX 3060 Ti"=>"RTX 3060 Ti 8GB" (use a VRAM padrão do chip se não estiver escrita).',
+    '        NÃO inclua o tipo de memória: "GT 1030 2GB GDDR5"=>"GT 1030 2GB" (nada de DDR5/GDDR5/GDDR6).',
     '  ATENÇÃO às variantes: "GTX 1660", "GTX 1660 Super" e "GTX 1660 Ti" são peças DIFERENTES.',
     '  CPU -> só o modelo. Ex.: "Ryzen 5 5600", "i5-10400F".',
     '  Placa-mãe -> "Placa-mãe" + chipset. Ex.: "Placa-mãe B550".',
