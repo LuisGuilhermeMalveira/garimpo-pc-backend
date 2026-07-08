@@ -25,7 +25,11 @@ function hashImagem(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
-const MIN_AMOSTRAS = 2; // mínimo de anúncios pra confiar numa mediana
+// mínimo de anúncios pra gravar. 1 é seguro DESDE a view precos_efetivos
+// pesar por amostras: entrada de 1 anúncio soma pouco, não domina o preço.
+// (Busca de CPU devolve 15 modelos diferentes com 1 anúncio cada — exigir 2
+// jogava tudo fora.)
+const MIN_AMOSTRAS = 1;
 
 const CATS_UNITARIA = new Set(['ram', 'ssd', 'hd']);
 
