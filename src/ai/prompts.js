@@ -48,6 +48,61 @@ const calibrador = {
   },
 };
 
+// ---------- CALIBRADOR AUTO (print de busca -> peças + preços, sem escolher antes) ----------
+const calibrador_auto = {
+  dificuldade: 'dificil', // identificação de modelo precisa ser precisa (1660 ≠ 1660 Super)
+  instrucao: [
+    'Você recebe um PRINT de página de busca de marketplace (OLX/Facebook) com vários anúncios',
+    'de peças de PC usadas. Para CADA anúncio que vende UMA PEÇA AVULSA com preço legível,',
+    'devolva a peça (nome canônico), a categoria e o preço.',
+    'Regras CRÍTICAS:',
+    '- IGNORE PCs/computadores/setups MONTADOS (título citando várias peças, "PC Gamer", "Computador").',
+    '- IGNORE anúncios com DEFEITO ("não liga", "com defeito", "não dá vídeo", "para retirar peças").',
+    '- IGNORE trocas sem preço de venda ("troco X por Y").',
+    '- IGNORE parcelas ("12x de R$...") — quero o preço cheio/à vista.',
+    '- Não invente modelo nem preço que não estejam legíveis.',
+    '- modelo = NOME CANÔNICO, SEM marca e SEM SKU (mesma regra do app):',
+    '  GPU -> chip + variante + VRAM. Ex.: "EVGA GTX 1660 Super SC 6GB"=>"GTX 1660 Super 6GB";',
+    '        "Galax RTX 3060 Ti"=>"RTX 3060 Ti 8GB" (use a VRAM padrão do chip se não estiver escrita).',
+    '  ATENÇÃO às variantes: "GTX 1660", "GTX 1660 Super" e "GTX 1660 Ti" são peças DIFERENTES.',
+    '  CPU -> só o modelo. Ex.: "Ryzen 5 5600", "i5-10400F".',
+    '  Placa-mãe -> "Placa-mãe" + chipset. Ex.: "Placa-mãe B550".',
+    '  RAM -> "Memória" + capacidade + DDR. Ex.: "Memória 8GB DDR4".',
+    '  SSD/HD -> tipo + capacidade. Ex.: "SSD 480GB", "HD 1TB".',
+    '  Fonte -> "Fonte" + potência. Ex.: "Fonte 600W".',
+    '- Se o modelo estiver incompleto no título (ex.: "placa de vídeo" sem modelo), NÃO inclua.',
+    '- Responda SOMENTE com JSON.',
+  ].join('\n'),
+  schema: {
+    name: 'calibracao_auto',
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        itens: {
+          type: 'array',
+          description: 'Um item por anúncio de peça avulsa com preço legível.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              categoria: {
+                type: 'string',
+                enum: ['gpu', 'cpu', 'mobo', 'ram', 'fonte', 'ssd', 'hd', 'cooler', 'gabinete', 'monitor', 'periferico', 'outro'],
+              },
+              modelo: { type: 'string', description: 'Nome canônico da peça.' },
+              preco: { type: 'number', description: 'Preço de venda em reais.' },
+            },
+            required: ['categoria', 'modelo', 'preco'],
+          },
+        },
+        observacoes: { type: 'string' },
+      },
+      required: ['itens', 'observacoes'],
+    },
+  },
+};
+
 // ---------- PARSER DE ANÚNCIO (print/texto -> specs + sinais) ----------
 const parser = {
   dificuldade: 'dificil',
@@ -198,7 +253,7 @@ const lote = {
   },
 };
 
-const TAREFAS = { calibrador, parser, lote };
+const TAREFAS = { calibrador, calibrador_auto, parser, lote };
 
 /**
  * Retorna o prompt de uma tarefa ('calibrador' | 'parser' | 'lote').

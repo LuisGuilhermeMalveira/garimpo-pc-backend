@@ -13,8 +13,9 @@
 
 const express = require('express');
 const { query } = require('../db/pool');
-const { upload, imagemDoRequest } = require('../middleware/upload');
+const { upload, imagemDoRequest, imagensDoRequest } = require('../middleware/upload');
 const { calibrar } = require('../services/calibrador');
+const { calibrarAuto } = require('../services/calibradorAuto');
 const { calcularFaixa } = require('../utils/mediana');
 const { classificarFrescor } = require('../services/frescor');
 const { uploadImagem, cloudinaryHabilitado } = require('../utils/cloudinary');
@@ -92,6 +93,32 @@ router.post('/calibrar', upload.single('imagem'), async (req, res, next) => {
       // dica de payload pra confirmar a gravação
       salvar_em: '/precos-base',
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /precos-base/calibrar-auto
+ * Print(s) de BUSCA sem escolher peça antes: a IA identifica cada peça avulsa,
+ * agrupa por modelo, casa com o banco e GRAVA a mediana de cada uma.
+ * Campos: multipart "imagem" (até 8) · provider? · tolerancia? · dry_run? (só simula)
+ */
+router.post('/calibrar-auto', upload.array('imagem', 8), async (req, res, next) => {
+  try {
+    const imagens = imagensDoRequest(req);
+    if (!imagens.length) return res.status(400).json({ erro: 'Envie ao menos um print de busca (campo "imagem").' });
+
+    const b = req.body || {};
+    const provider = ['anthropic', 'openai'].includes(b.provider) ? b.provider : undefined;
+    const resultado = await calibrarAuto({
+      imagens,
+      userId: req.userId,
+      provider,
+      tolerancia: b.tolerancia != null ? Number(b.tolerancia) : undefined,
+      dryRun: b.dry_run === '1' || b.dry_run === 'true' || b.dry_run === true,
+    });
+    res.json(resultado);
   } catch (err) {
     next(err);
   }
