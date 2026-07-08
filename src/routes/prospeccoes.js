@@ -159,6 +159,26 @@ router.post('/reavaliar', async (req, res, next) => {
  * Body: { raw_extracao, titulo?, origem?, cidade_id?, link_origem?, imagem_url?, custo_recuperacao? }
  */
 router.post('/', async (req, res, next) => {
+  // mesmo link = mesmo anúncio: ATUALIZA a prospecção existente em vez de
+  // duplicar (garimpar de novo pela extensão refresca preço/peças/veredito).
+  try {
+    const link = req.body && req.body.link_origem;
+    if (link) {
+      const dup = await query(
+        `SELECT id FROM prospeccoes
+          WHERE user_id = $1 AND link_origem = $2
+          ORDER BY id DESC LIMIT 1`,
+        [req.userId, link]
+      );
+      if (dup.rows[0]) {
+        req.params.id = String(dup.rows[0].id);
+        return atualizarProspeccao(req, res, next);
+      }
+    }
+  } catch (err) {
+    return next(err);
+  }
+
   const client = await pool.connect();
   try {
     const b = req.body || {};
@@ -251,7 +271,7 @@ router.post('/', async (req, res, next) => {
  * a mesma prospecção (itens/modificadores são regravados). Pra ajustar o PC
  * depois de conversar com o vendedor (add/remover/especificar peças).
  */
-router.put('/:id', async (req, res, next) => {
+async function atualizarProspeccao(req, res, next) {
   const client = await pool.connect();
   try {
     const id = Number(req.params.id);
@@ -329,14 +349,16 @@ router.put('/:id', async (req, res, next) => {
     await inserirFilhos(client, id, a);
 
     await client.query('COMMIT');
-    res.json({ id, veredito: a.veredito, analise: a });
+    res.json({ id, veredito: a.veredito, analise: a, atualizado: true });
   } catch (err) {
     await client.query('ROLLBACK');
     next(err);
   } finally {
     client.release();
   }
-});
+}
+
+router.put('/:id', atualizarProspeccao);
 
 // GET /prospeccoes (?status=)
 router.get('/', async (req, res, next) => {
