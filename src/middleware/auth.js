@@ -29,15 +29,28 @@ function extrairToken(req) {
   return null;
 }
 
+// tokens aceitos: APP_TOKEN (Luís) + APP_TOKENS_EXTRAS (lista separada por
+// vírgula — amigos testando). TODOS operam na MESMA conta (user 1) por
+// enquanto; conta separada é a fase multi-tenant.
+function tokensValidos() {
+  const lista = [process.env.APP_TOKEN];
+  const extras = process.env.APP_TOKENS_EXTRAS || '';
+  for (const t of extras.split(',')) {
+    const limpo = t.trim();
+    if (limpo) lista.push(limpo);
+  }
+  return lista.filter(Boolean);
+}
+
 function auth(req, res, next) {
-  const esperado = process.env.APP_TOKEN;
-  if (!esperado) {
+  const validos = tokensValidos();
+  if (validos.length === 0) {
     return res.status(500).json({
       erro: 'APP_TOKEN não configurado no servidor (.env). Auth indisponível.',
     });
   }
   const token = extrairToken(req);
-  if (!token || token !== esperado) {
+  if (!token || !validos.includes(token)) {
     return res.status(401).json({ erro: 'Não autorizado: token ausente ou inválido.' });
   }
   req.userId = USUARIO_PADRAO;
