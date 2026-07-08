@@ -49,11 +49,18 @@ class AnthropicProvider extends AiProvider {
     ].join('\n');
   }
 
-  async _chamar(blocosConteudo, dificuldade) {
+  /**
+   * A instrução+schema vai como SYSTEM com prompt caching (ephemeral, 5 min):
+   * é idêntica em toda chamada da mesma tarefa — nos tiles de uma calibração e
+   * entre calibrações seguidas, sai do cache com ~90% de desconto. As imagens
+   * (que variam) ficam DEPOIS do prefixo cacheado, então não invalidam nada.
+   */
+  async _chamar({ system, conteudo, dificuldade }) {
     const resp = await this.client.messages.create({
       model: this._modelo(dificuldade),
       max_tokens: 2048,
-      messages: [{ role: 'user', content: blocosConteudo }],
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: conteudo }],
     });
     const texto = (resp.content || [])
       .filter((b) => b.type === 'text')
@@ -62,7 +69,7 @@ class AnthropicProvider extends AiProvider {
     return parseJsonSeguro(texto);
   }
 
-  async extrairDeImagem({ imagem, imagens, schema, instrucao, dificuldade }) {
+  async extrairDeImagem({ imagem, imagens, texto, schema, instrucao, dificuldade }) {
     const lista = imagens && imagens.length ? imagens : imagem ? [imagem] : [];
     if (lista.length === 0 || !lista[0].base64) {
       throw new Error('extrairDeImagem: forneça imagem(ns) com base64');
@@ -72,17 +79,25 @@ class AnthropicProvider extends AiProvider {
         type: 'image',
         source: { type: 'base64', media_type: im.mimetype || 'image/png', data: im.base64 },
       })),
-      { type: 'text', text: this._instrucaoComSchema(instrucao, schema) },
+      ...(texto
+        ? [{ type: 'text', text: `TEXTO DA PÁGINA (capturado junto do print; fonte adicional):\n${texto}` }]
+        : []),
+      { type: 'text', text: 'Extraia os dados do(s) print(s) acima conforme as instruções.' },
     ];
-    return this._chamar(conteudo, dificuldade);
+    return this._chamar({
+      system: this._instrucaoComSchema(instrucao, schema),
+      conteudo,
+      dificuldade,
+    });
   }
 
   async extrairDeTexto({ texto, schema, instrucao, dificuldade }) {
-    const conteudo = [
-      { type: 'text', text: this._instrucaoComSchema(instrucao, schema) },
-      { type: 'text', text: '\n\n--- CONTEÚDO ---\n' + String(texto || '') },
-    ];
-    return this._chamar(conteudo, dificuldade);
+    const conteudo = [{ type: 'text', text: '--- CONTEÚDO ---\n' + String(texto || '') }];
+    return this._chamar({
+      system: this._instrucaoComSchema(instrucao, schema),
+      conteudo,
+      dificuldade,
+    });
   }
 }
 

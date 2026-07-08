@@ -57,7 +57,7 @@ class OpenAiProvider extends AiProvider {
     return parseJsonSeguro(texto);
   }
 
-  async extrairDeImagem({ imagem, imagens, schema, instrucao, dificuldade }) {
+  async extrairDeImagem({ imagem, imagens, texto, schema, instrucao, dificuldade }) {
     const lista = imagens && imagens.length ? imagens : imagem ? [imagem] : [];
     if (lista.length === 0 || !lista[0].base64) {
       throw new Error('extrairDeImagem: forneça imagem(ns) com base64');
@@ -71,6 +71,9 @@ class OpenAiProvider extends AiProvider {
             type: 'image_url',
             image_url: { url: `data:${im.mimetype || 'image/png'};base64,${im.base64}` },
           })),
+          ...(texto
+            ? [{ type: 'text', text: `TEXTO DA PÁGINA (capturado junto do print; fonte adicional):\n${texto}` }]
+            : []),
         ],
       },
     ];

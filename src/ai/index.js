@@ -86,20 +86,18 @@ function getProvider(tarefa) {
 async function executarTarefa({ tarefa, imagem, imagens, texto, providerNome, contexto }) {
   const prompt = getPrompt(tarefa);
   const provider = providerNome ? instanciar(providerNome) : getProvider(tarefa);
-  let instrucao = contexto ? `${prompt.instrucao}\n\nCONTEXTO: ${contexto}` : prompt.instrucao;
-  // imagem + texto juntos: o texto vira fonte adicional (a extensão manda o
-  // texto da página junto com o print — antes era descartado)
-  const temImagem = (imagens && imagens.length) || imagem;
-  if (temImagem && texto != null && String(texto).trim()) {
-    instrucao += `\n\nTEXTO DA PÁGINA (capturado junto do print; use como fonte adicional):\n${String(texto).slice(0, 12000)}`;
-  }
+  const instrucao = contexto ? `${prompt.instrucao}\n\nCONTEXTO: ${contexto}` : prompt.instrucao;
   const args = {
     schema: prompt.schema,
     instrucao,
     dificuldade: prompt.dificuldade,
   };
-  if (imagens && imagens.length) return provider.extrairDeImagem({ imagens, ...args });
-  if (imagem) return provider.extrairDeImagem({ imagem, ...args });
+  // imagem + texto juntos: o texto da página vai como bloco adicional (fonte
+  // extra pro parser). Fica FORA da instrução pra não invalidar o prompt cache.
+  const temImagem = (imagens && imagens.length) || imagem;
+  const textoExtra = temImagem && texto != null && String(texto).trim() ? String(texto).slice(0, 12000) : null;
+  if (imagens && imagens.length) return provider.extrairDeImagem({ imagens, texto: textoExtra, ...args });
+  if (imagem) return provider.extrairDeImagem({ imagem, texto: textoExtra, ...args });
   if (texto != null) return provider.extrairDeTexto({ texto, ...args });
   throw new Error('executarTarefa: forneça imagem(ns) ou texto');
 }

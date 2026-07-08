@@ -13,12 +13,17 @@
  *  - dry_run=true faz tudo menos gravar (pra conferir antes).
  */
 
+const crypto = require('crypto');
 const ai = require('../ai');
 const { query } = require('../db/pool');
 const { calcularFaixa } = require('../utils/mediana');
 const { bufferParaTiles } = require('../utils/imagem');
 const { casar } = require('../utils/matcher');
 const { classificarFrescor } = require('./frescor');
+
+function hashImagem(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
 
 const MIN_AMOSTRAS = 2; // mínimo de anúncios pra confiar numa mediana
 
@@ -81,10 +86,45 @@ async function calibrarAuto({ imagens, userId, provider, tolerancia, dryRun = fa
 
   const providerNome = provider || ai.resolverNomeProvider('calibrador');
 
+  // 0) anti-duplicata: print idêntico (mesmo hash) já calibrado é barrado
+  //    ANTES de gastar IA — protege o banco de dupla contagem. (dry_run passa
+  //    direto: é modo de teste.)
+  let imgs = imagens;
+  let hashesNovos = [];
+  let observacoes = '';
+  if (!dryRun) {
+    const unicos = [];
+    const vistos = new Set();
+    for (const im of imagens) {
+      const h = hashImagem(im.buffer);
+      if (vistos.has(h)) continue; // mesmo arquivo repetido no mesmo envio
+      vistos.add(h);
+      unicos.push({ im, h });
+    }
+    const { rows } = await query(
+      `SELECT hash, to_char(criado_em AT TIME ZONE 'America/Sao_Paulo', 'DD/MM') AS dia
+         FROM prints_processados WHERE user_id = $1 AND hash = ANY($2)`,
+      [userId, unicos.map((u) => u.h)]
+    );
+    const jaVistos = new Map(rows.map((r) => [r.hash, r.dia]));
+    const novos = unicos.filter((u) => !jaVistos.has(u.h));
+    if (novos.length === 0) {
+      const dia = rows[0] ? rows[0].dia : '';
+      throw new Error(
+        `Print idêntico já calibrado${dia ? ` em ${dia}` : ''} — barrado pra não contar dobrado. ` +
+          'A OLX muda toda hora: atualize a busca e capture de novo.'
+      );
+    }
+    if (novos.length < unicos.length) {
+      observacoes += `${unicos.length - novos.length} print(s) idêntico(s) já calibrado(s) — pulados.`;
+    }
+    imgs = novos.map((u) => u.im);
+    hashesNovos = novos.map((u) => u.h);
+  }
+
   // 1) IA lê cada print (fatiado se for comprido) e lista {categoria, modelo, preco}
   const itens = [];
-  let observacoes = '';
-  for (const img of imagens) {
+  for (const img of imgs) {
     const fatias = await bufferParaTiles(img.buffer);
     for (const tile of fatias.tiles) {
       const ex = await ai.executarTarefa({ tarefa: 'calibrador_auto', imagem: tile, providerNome });
@@ -155,6 +195,20 @@ async function calibrarAuto({ imagens, userId, provider, tolerancia, dryRun = fa
       gravado: !dryRun,
       data: gravacao ? gravacao.data_calibracao : null,
     });
+  }
+
+  // 4) registra os hashes processados (reenvio idêntico será barrado) e
+  //    limpa registros velhos (>90 dias)
+  if (!dryRun && hashesNovos.length) {
+    await query(
+      `INSERT INTO prints_processados (user_id, hash)
+       SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING`,
+      [userId, hashesNovos]
+    );
+    await query(
+      `DELETE FROM prints_processados WHERE user_id = $1 AND criado_em < now() - interval '90 days'`,
+      [userId]
+    );
   }
 
   return {
