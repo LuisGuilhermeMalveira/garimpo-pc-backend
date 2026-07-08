@@ -50,13 +50,10 @@ async function carregarConfig(userId) {
 async function carregarCatalogo(userId) {
   const { rows } = await query(
     `SELECT p.id, p.categoria, p.nome, p.tipo, p.capacidade, p.liquidez, p.dias_venda_estim,
-            pb.preco_mediana, pb.preco_min, pb.preco_max, pb.data_calibracao,
-            (CURRENT_DATE - pb.data_calibracao::date) AS dias_desde_calibracao
+            pe.preco_mediana, pe.preco_min, pe.preco_max, pe.data_calibracao,
+            (CURRENT_DATE - pe.data_calibracao::date) AS dias_desde_calibracao
        FROM pecas p
-       LEFT JOIN LATERAL (
-         SELECT * FROM precos_base WHERE peca_id = p.id
-         ORDER BY data_calibracao DESC LIMIT 1
-       ) pb ON true
+       LEFT JOIN precos_efetivos pe ON pe.peca_id = p.id
       WHERE p.user_id = $1`,
     [userId]
   );

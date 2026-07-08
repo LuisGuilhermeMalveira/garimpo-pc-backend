@@ -46,12 +46,9 @@ function chaveGrupo(item) {
 async function carregarCatalogo(userId) {
   const { rows } = await query(
     `SELECT p.id, p.categoria, p.nome, p.tipo, p.capacidade,
-            pb.preco_mediana
+            pe.preco_mediana
        FROM pecas p
-       LEFT JOIN LATERAL (
-         SELECT preco_mediana FROM precos_base WHERE peca_id = p.id
-         ORDER BY data_calibracao DESC LIMIT 1
-       ) pb ON true
+       LEFT JOIN precos_efetivos pe ON pe.peca_id = p.id
       WHERE p.user_id = $1`,
     [userId]
   );

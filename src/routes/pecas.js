@@ -43,8 +43,11 @@ function enriquecer(row) {
           preco_min: Number(row.preco_min),
           preco_mediana: Number(row.preco_mediana),
           preco_max: Number(row.preco_max),
-          amostras: row.amostras,
-          fonte: row.fonte,
+          amostras: Number(row.amostras),
+          fonte:
+            Number(row.total_calibracoes) > 1
+              ? `${row.total_calibracoes} calibrações (peso por data)`
+              : 'print de busca',
           data_calibracao: row.data_calibracao,
         },
     frescor,
@@ -70,17 +73,14 @@ router.get('/', async (req, res, next) => {
     const { rows } = await query(
       `SELECT p.id, p.categoria, p.nome, p.tipo, p.capacidade, p.liquidez,
               p.dias_venda_estim, p.observacao,
-              pb.preco_min, pb.preco_mediana, pb.preco_max, pb.amostras,
-              pb.fonte, pb.data_calibracao,
-              (CURRENT_DATE - pb.data_calibracao::date) AS dias_desde_calibracao,
-              (SELECT count(*) FROM precos_base WHERE peca_id = p.id) AS total_calibracoes,
+              pe.preco_min, pe.preco_mediana, pe.preco_max, pe.amostras,
+              pe.data_calibracao,
+              (CURRENT_DATE - pe.data_calibracao::date) AS dias_desde_calibracao,
+              pe.total_calibracoes,
               (SELECT array_agg(preco_mediana ORDER BY data_calibracao)
                  FROM precos_base WHERE peca_id = p.id) AS medianas_hist
          FROM pecas p
-         LEFT JOIN LATERAL (
-           SELECT * FROM precos_base WHERE peca_id = p.id
-           ORDER BY data_calibracao DESC LIMIT 1
-         ) pb ON true
+         LEFT JOIN precos_efetivos pe ON pe.peca_id = p.id
         WHERE ${conds.join(' AND ')}
         ORDER BY p.categoria, p.nome`,
       params
