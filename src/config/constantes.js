@@ -7,9 +7,6 @@
  */
 
 module.exports = {
-  // Frete padrão quando o anúncio tem entrega mas não informa o valor (~R$26).
-  FRETE_PADRAO: 26,
-
   // PISO por categoria: valor de CHÃO de uma peça genérica/sem modelo, em R$.
   // Quando a peça não casa no banco e não tem preço manual, é contada por esse
   // piso (valor baixo conservador) em vez de virar "faltante" e travar o PC.

@@ -313,18 +313,24 @@ async function avaliar({ extracao, userId = 1, opcoes = {} }) {
   // 5. realização
   const valor_revenda = r2(valor_modificado * config.fator_realizacao);
 
-  // 6. custos
+  // 6. custos — SEMPRE o combustível da cidade (distância). "Entrega Fácil"
+  // da OLX não entra na conta: é enganoso e o Luís busca pessoalmente de
+  // qualquer jeito. Anúncio com entrega vira só observação/negociação.
   const cidade = acharCidade(cidades, opcoes.cidade_id ?? extracao.cidade);
   const temEntrega = !!extracao.tem_entrega;
   let custo_aquisicao = 0;
-  if (temEntrega) {
-    custo_aquisicao = Number(extracao.valor_entrega) || C.FRETE_PADRAO;
-  } else if (cidade) {
+  if (cidade) {
     custo_aquisicao = Number(cidade.custo_aquisicao) || 0;
   } else if (extracao.cidade) {
     alertas.push({
       nivel: 'amarelo',
       msg: `Cidade "${extracao.cidade}" não cadastrada — combustível não descontado. Cadastre em /cidades.`,
+    });
+  }
+  if (temEntrega) {
+    alertas.push({
+      nivel: 'info',
+      msg: 'Anúncio oferece entrega — se o vendedor trouxer, você economiza a viagem (use na negociação).',
     });
   }
   custo_aquisicao = r2(custo_aquisicao);
