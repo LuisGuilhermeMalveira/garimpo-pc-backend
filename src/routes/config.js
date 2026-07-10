@@ -75,11 +75,17 @@ router.patch('/', async (req, res, next) => {
     let i = 1;
     for (const c of campos) {
       if (req.body && req.body[c] !== undefined) {
-        const v = Number(req.body[c]);
+        // aceita vírgula decimal; vazio/inválido é ERRO explícito (nunca vira 0
+        // silencioso — foi assim que o custo_km zerou e o combustível sumiu)
+        const bruto = req.body[c];
+        if (bruto === null || bruto === '') {
+          return res.status(400).json({ erro: `${c}: valor vazio — digite um número.` });
+        }
+        const v = Number(String(bruto).replace(',', '.'));
         if (!dentro(c, v)) {
           return res
             .status(400)
-            .json({ erro: `${c} fora do intervalo permitido (${LIMITES[c][0]}–${LIMITES[c][1]}).` });
+            .json({ erro: `${c} inválido ou fora do intervalo (${LIMITES[c][0]}–${LIMITES[c][1]}).` });
         }
         sets.push(`${c} = $${i++}`);
         vals.push(v);

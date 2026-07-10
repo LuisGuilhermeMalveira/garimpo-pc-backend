@@ -14,11 +14,18 @@ const { query } = require('../db/pool');
 
 const router = express.Router();
 
+// aceita vírgula decimal brasileira ("200,5" -> 200.5); inválido vira null
+function numBr(v) {
+  if (v == null || v === '') return null;
+  const n = Number(String(v).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
 // custo de combustível derivado do km, usando o custo_km do usuário.
 async function custoPorKm(userId, km) {
   const { rows } = await query('SELECT custo_km FROM usuarios WHERE id = $1', [userId]);
   const ckm = rows[0] ? Number(rows[0].custo_km) : 0;
-  return Math.round((Number(km) || 0) * ckm);
+  return Math.round((numBr(km) || 0) * ckm);
 }
 
 // GET /cidades
@@ -40,20 +47,21 @@ router.get('/', async (req, res, next) => {
 // POST /cidades
 router.post('/', async (req, res, next) => {
   try {
-    const { nome, km_ida_volta } = req.body || {};
-    let { custo_aquisicao } = req.body || {};
-    if (!nome || km_ida_volta == null) {
-      return res.status(400).json({ erro: 'nome e km_ida_volta são obrigatórios.' });
+    const { nome } = req.body || {};
+    const km = numBr((req.body || {}).km_ida_volta);
+    if (!nome || km == null) {
+      return res.status(400).json({ erro: 'nome e km_ida_volta (número) são obrigatórios.' });
     }
     // sem valor digitado -> calcula pelo km
-    if (custo_aquisicao == null || custo_aquisicao === '') {
-      custo_aquisicao = await custoPorKm(req.userId, km_ida_volta);
+    let custo = numBr((req.body || {}).custo_aquisicao);
+    if (custo == null) {
+      custo = await custoPorKm(req.userId, km);
     }
     const { rows } = await query(
       `INSERT INTO cidades (user_id, nome, km_ida_volta, custo_aquisicao)
        VALUES ($1, $2, $3, $4)
        RETURNING id, nome, km_ida_volta, custo_aquisicao, criado_em`,
-      [req.userId, nome, km_ida_volta, custo_aquisicao]
+      [req.userId, nome, km, custo]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -66,6 +74,15 @@ router.patch('/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const body = req.body || {};
+
+    // normaliza números (aceita vírgula); inválido explícito -> 400
+    for (const c of ['km_ida_volta', 'custo_aquisicao']) {
+      if (body[c] !== undefined && body[c] !== null && body[c] !== '') {
+        const n = numBr(body[c]);
+        if (n == null) return res.status(400).json({ erro: `${c} inválido: "${body[c]}" não é número.` });
+        body[c] = n;
+      }
+    }
 
     // se mudou o km mas não mandou custo, recalcula o combustível pelo km novo
     if (body.km_ida_volta != null && (body.custo_aquisicao == null || body.custo_aquisicao === '')) {
