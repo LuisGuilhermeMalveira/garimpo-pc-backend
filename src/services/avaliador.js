@@ -340,7 +340,10 @@ async function avaliar({ extracao, userId = 1, opcoes = {} }) {
   let custo_recuperacao = opcoes.custo_recuperacao != null ? Number(opcoes.custo_recuperacao) : 0;
   custo_recuperacao = r2(custo_recuperacao);
 
-  const preco_ref = Number(extracao.preco_pix ?? extracao.preco_pedido) || 0;
+  // referência = preço PEDIDO. O "preço no Pix" da OLX é desconto de meio de
+  // pagamento da plataforma, não o preço do vendedor — fora da conta.
+  // (pix só entra como fallback se o anúncio não tiver o pedido legível)
+  const preco_ref = Number(extracao.preco_pedido ?? extracao.preco_pix) || 0;
   const margem_risco = r2(config.margem_risco_pct * preco_ref);
 
   // 7. lucro
