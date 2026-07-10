@@ -36,6 +36,22 @@ router.post('/', upload.single('imagem'), async (req, res, next) => {
   }
 });
 
+// GET /capturas/:id/imagem — o print em si (miniatura de conferência na Triagem)
+router.get('/:id/imagem', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'SELECT imagem_b64, mimetype FROM capturas WHERE id = $1 AND user_id = $2',
+      [Number(req.params.id), req.userId]
+    );
+    if (!rows[0]) return res.status(404).json({ erro: 'Captura não encontrada (expirou?).' });
+    res.set('Content-Type', rows[0].mimetype || 'image/jpeg');
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.send(Buffer.from(rows[0].imagem_b64, 'base64'));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /capturas/:id — só metadados (a Triagem mostra "print carregado")
 router.get('/:id', async (req, res, next) => {
   try {
